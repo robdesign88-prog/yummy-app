@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yummy - Escáner de Restaurantes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .turquoise-glow {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        .laser-scan {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: #06b6d4;
+            box-shadow: 0 0 10px #06b6d4, 0 0 20px #06b6d4;
+            animation: scan 2s infinite alternate ease-in-out;
+        }
+        @keyframes scan {
+            0% { top: 10%; }
+            100% { top: 90%; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+<!-- Header -->
+<header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center shadow-md">
+    <div class="flex items-center space-x-2">
+        <div class="bg-cyan-500 text-slate-950 p-2 rounded-xl font-bold flex items-center justify-center w-10 h-10 shadow-lg">
+            <i class="fa-solid fa-utensils text-lg"></i>
+        </div>
+        <div>
+            <h1 class="font-bold text-lg tracking-wide text-cyan-400">Yummy</h1>
+            <p class="text-xs text-slate-400">Escáner Gastronómico • México</p>
+        </div>
+    </div>
+    <button onclick="toggleGps()" id="gpsBtn" class="bg-slate-800 border border-slate-700 text-xs px-3 py-2 rounded-lg flex items-center space-x-1 text-slate-300 hover:border-cyan-500 transition">
+        <i class="fa-solid fa-location-crosshairs text-cyan-400"></i>
+        <span id="gpsStatus">GPS Activo</span>
+    </button>
+</header>
+
+<!-- Main Content -->
+<main class="flex-1 max-w-md w-full mx-auto p-4 flex flex-col space-y-4 pb-20">
+
+    <!-- Camera Viewfinder -->
+    <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden h-64 flex flex-col items-center justify-center shadow-xl">
+        <!-- Video de la cámara real -->
+        <video id="cameraFeed" autoplay playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+        
+        <!-- Fondo de respaldo si la cámara está apagada -->
+        <div id="demoBackground" class="absolute inset-0 bg-cover bg-center opacity-40" style="background-image: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80')"></div>
+        
+        <!-- Láser Animado de Escaneo -->
+        <div class="laser-scan" id="laserLine"></div>
+
+        <!-- Interfaz superpuesta del visor -->
+        <div class="absolute inset-0 border-2 border-cyan-500/30 m-4 rounded-xl pointer-events-none flex flex-col justify-between p-3">
+            <div class="flex justify-between text-cyan-400 text-xs font-mono">
+                <span id="camStatusText">[CAM: STANDBY]</span>
+                <span>AI-LENS v2.4</span>
+            </div>
+            <div class="text-center bg-slate-950/70 backdrop-blur-md py-1 px-3 rounded-full self-center border border-cyan-500/40">
+                <span class="text-xs text-cyan-300 font-medium" id="camHelperText">Presiona encender cámara</span>
+            </div>
+            <div class="text-right text-xs font-mono text-cyan-400">MEXICO_DF</div>
+        </div>
+
+        <!-- Controles de la cámara -->
+        <div class="absolute bottom-4 z-10 flex space-x-3">
+            <button onclick="triggerScan()" class="bg-cyan-500 text-slate-950 px-5 py-2 rounded-full font-bold text-sm shadow-lg hover:bg-cyan-400 transition flex items-center space-x-2">
+                <i class="fa-solid fa-camera"></i>
+                <span>Escanear Local</span>
+            </button>
+            <button onclick="toggleCamera()" id="camToggleBtn" class="bg-slate-800/90 backdrop-blur border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-full text-sm hover:bg-slate-700 transition flex items-center space-x-1.5 font-medium">
+                <i class="fa-solid fa-power-off"></i>
+                <span>Encender Cámara</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Result Card -->
+    <div id="resultCard" class="bg-slate-900 border border-cyan-500/40 rounded-2xl p-4 shadow-xl space-y-3 turquoise-glow">
+        <div class="flex justify-between items-start">
+            <div>
+                <span class="bg-cyan-500/10 text-cyan-400 text-xs px-2.5 py-1 rounded-md font-semibold border border-cyan-500/20" id="placeCategory">Restaurante Tradicional</span>
+                <h2 class="text-xl font-bold mt-1 text-slate-100" id="placeName">La Casa del Pastor</h2>
+                <p class="text-xs text-slate-400 flex items-center mt-0.5">
+                    <i class="fa-solid fa-map-pin text-cyan-400 mr-1"></i> <span id="placeLocation">Col. Narvarte Poniente, CDMX</span>
+                </p>
+            </div>
+            <div class="text-right bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                <div class="text-yellow-400 font-bold text-lg flex items-center">
+                    <i class="fa-solid fa-star text-sm mr-1"></i><span id="placeRating">4.7</span>
+                </div>
+                <span class="text-[10px] text-slate-400" id="placeReviewsCount">1,420 reseñas</span>
+            </div>
+        </div>
+
+        <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 text-xs space-y-1">
+            <p class="text-slate-300 font-medium">💬 Opinión destacada de IA:</p>
+            <p class="text-slate-400 italic" id="placeAiSummary">"Excelente sazón, servicio rápido y ambiente familiar muy agradable. Altamente recomendados los tacos al pastor y el agua de horchata."</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+            <button onclick="openTab('rate')" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 px-3 rounded-xl font-medium text-slate-200 flex items-center justify-center space-x-1.5 transition">
+                <i class="fa-solid fa-star text-yellow-400"></i>
+                <span>Calificar local</span>
+            </button>
+            <button onclick="openTab('review')" class="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-xs py-2 px-3 rounded-xl font-medium text-cyan-300 flex items-center justify-center space-x-1.5 transition">
+                <i class="fa-solid fa-pen-nib"></i>
+                <span>Escribir reseña</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Dynamic Action Sections (Rate / Review) -->
+    <div id="interactiveSection" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+            <h3 class="font-bold text-sm text-slate-200" id="sectionTitle">Panel de Interacción</h3>
+            <span class="text-xs text-cyan-400 cursor-pointer" onclick="resetSection()">Cerrar</span>
+        </div>
+        <div id="sectionContent">
+            <p class="text-xs text-slate-400 text-center py-4">Selecciona "Calificar local" o "Escribir reseña" arriba para interactuar con este establecimiento en tiempo real.</p>
+        </div>
+    </div>
+
+</main>
+
+<!-- JavaScript Logic -->
+<script>
+    let cameraActive = false;
+    let mediaStream = null;
+
+    async function toggleCamera() {
+        const video = document.getElementById('cameraFeed');
+        const demoBg = document.getElementById('demoBackground');
+        const camStatus = document.getElementById('camStatusText');
+        const helperText = document.getElementById('camHelperText');
+        const toggleBtn = document.getElementById('camToggleBtn');
+        
+        cameraActive = !cameraActive;
+
+        if (cameraActive) {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                    audio: false 
+                });
+                
+                video.srcObject = mediaStream;
+                video.classList.remove('hidden');
+                demoBg.classList.add('hidden');
+                
+                camStatus.innerText = "[CAM: ACTIVE]";
+                camStatus.classList.add("text-emerald-400");
+                helperText.innerText = "Apunte al letrero o fachada";
+                toggleBtn.innerHTML = `<i class="fa-solid fa-power-off"></i> <span>Apagar Cámara</span>`;
+                toggleBtn.classList.add("bg-cyan-500", "text-slate-950");
+                toggleBtn.classList.remove("bg-slate-800/90", "text-cyan-400");
+
+            } catch (err) {
+                console.error("Error al acceder a la cámara:", err);
+                alert("No se pudo encender la cámara. Asegúrate de dar permisos en el navegador.");
+                cameraActive = false;
+            }
+        } else {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            video.srcObject = null;
+            video.classList.add('hidden');
+            demoBg.classList.remove('hidden');
+            
+            camStatus.innerText = "[CAM: STANDBY]";
+            camStatus.classList.remove("text-emerald-400");
+            helperText.innerText = "Presiona encender cámara";
+            toggleBtn.innerHTML = `<i class="fa-solid fa-power-off"></i> <span>Encender Cámara</span>`;
+            toggleBtn.classList.remove("bg-cyan-500", "text-slate-950");
+            toggleBtn.classList.add("bg-slate-800/90", "text-cyan-400");
+        }
+    }
+
+    function triggerScan() {
+        const places = [
+            { name: "El Pescadito", cat: "Tacos de Pescado", loc: "Col. Condesa, CDMX", rating: "4.8", count: "2,300", summary: "Los tacos de camarón con queso están increíblemente crujientes. Buen servicio." },
+            { name: "Pozolería Matamoros", cat: "Comida Tradicional Mexicana", loc: "Col. Narvarte, CDMX", rating: "4.6", count: "890", summary: "Pozole estilo guerrerense auténtico con porciones generosas y excelente aguacate." },
+            { name: "Café Carcamo", cat: "Cafetería de Especialidad", loc: "Col. Roma Norte, CDMX", rating: "4.9", count: "450", summary: "Café de grano mexicano excepcional, ideal para trabajar o leer por la tarde." }
+        ];
+        const randomPlace = places[Math.floor(Math.random() * places.length)];
+        
+        document.getElementById('placeName').innerText = randomPlace.name;
+        document.getElementById('placeCategory').innerText = randomPlace.cat;
+        document.getElementById('placeLocation').innerText = randomPlace.loc;
+        document.getElementById('placeRating').innerText = randomPlace.rating;
+        document.getElementById('placeReviewsCount').innerText = randomPlace.count + " reseñas";
+        document.getElementById('placeAiSummary').innerText = `"${randomPlace.summary}"`;
+    }
+
+    function openTab(type) {
+        const title = document.getElementById('sectionTitle');
+        const content = document.getElementById('sectionContent');
+        
+        if (type === 'rate') {
+            title.innerText = "Califica este establecimiento";
+            content.innerHTML = `
+                <div class="flex justify-center space-x-2 py-2 text-2xl text-yellow-400">
+                    <i class="fa-solid fa-star cursor-pointer hover:scale-110 transition"></i>
+                    <i class="fa-solid fa-star cursor-pointer hover:scale-110 transition"></i>
+                    <i class="fa-solid fa-star cursor-pointer hover:scale-110 transition"></i>
+                    <i class="fa-solid fa-star cursor-pointer hover:scale-110 transition"></i>
+                    <i class="fa-regular fa-star cursor-pointer hover:scale-110 transition"></i>
+                </div>
+                <button onclick="submitAction('¡Calificación guardada con éxito!')" class="w-full bg-cyan-500 text-slate-950 font-bold text-xs py-2 rounded-xl mt-2">Enviar Calificación</button>
+            `;
+        } else {
+            title.innerText = "Escribe tu reseña";
+            content.innerHTML = `
+                <textarea class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 focus:border-cyan-500 outline-none" rows="3" placeholder="¿Qué tal estuvo la comida, el servicio y los precios?"></textarea>
+                <button onclick="submitAction('¡Reseña publicada en Yummy!')" class="w-full bg-cyan-500 text-slate-950 font-bold text-xs py-2 rounded-xl mt-2">Publicar Reseña</button>
+            `;
+        }
+    }
+
+    function submitAction(msg) {
+        alert(msg);
+        resetSection();
+    }
+
+    function resetSection() {
+        document.getElementById('sectionTitle').innerText = "Panel de Interacción";
+        document.getElementById('sectionContent').innerHTML = `<p class="text-xs text-slate-400 text-center py-4">Selecciona "Calificar local" o "Escribir reseña" arriba para interactuar con este establecimiento en tiempo real.</p>`;
+    }
+
+    function toggleGps() {
+        const status = document.getElementById('gpsStatus');
+        if(navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                status.innerText = "GPS Ubicado (México)";
+                alert("Ubicación GPS obtenida correctamente a nivel nacional.");
+            }, () => {
+                status.innerText = "GPS Simulado";
+            });
+        }
+    }
+</script>
+</body>
+</html>
